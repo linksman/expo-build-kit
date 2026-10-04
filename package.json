@@ -1,0 +1,21 @@
+{
+  "name": "expo-build-kit",
+  "version": "0.1.0",
+  "description": "Local Android build, install, Play Store and OTA-hotfix commands plus config plugins for Expo apps",
+  "license": "MIT",
+  "repository": "github:linksman/expo-build-kit",
+  "bin": {
+    "expo-build": "bin/expo-build"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "plugins"
+  ],
+  "peerDependencies": {
+    "expo": "*"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

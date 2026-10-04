@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# expo-build — local Android build, install, Play Store and OTA-hotfix commands
+# for Expo apps. Run from the Expo app's folder (the one with
+# expo-build.config.json), e.g. via `npx expo-build` or an npm script.
+set -euo pipefail
+
+# Resolve through node_modules/.bin's symlink to find this kit's lib/.
+src="${BASH_SOURCE[0]}"
+while [ -L "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  [[ $src == /* ]] || src="$dir/$src"
+done
+KIT_DIR="$(cd -P "$(dirname "$src")/.." && pwd)"
+# shellcheck source=../lib/common.sh
+source "$KIT_DIR/lib/common.sh"
+
+usage() {
+  cat <<'USAGE'
+usage: expo-build <command> [args]
+
+  install <major|minor|patch|no_change> <apk|aab>
+      Release build (debug-signed), installed on the connected device.
+  playstore <major|minor|patch|no_change>
+      Release AAB signed with the upload key, for Play Console.
+  dev [open]
+      Development build (expo-dev-client) loading JS live from Metro.
+      `open` skips the build and just reconnects/relaunches it.
+  hotfix <preview|production> "<message>"
+      JS-only over-the-air update (EAS Update) to installed builds.
+
+Run from the Expo app's folder (the one with expo-build.config.json).
+USAGE
+}
+
+cmd="${1:-help}"
+[ $# -gt 0 ] && shift
+case "$cmd" in
+  install|playstore|dev|hotfix)
+    # Allow running from a subfolder of the app: walk up to the config file.
+    while [ ! -f expo-build.config.json ]; do
+      [ "$(pwd)" != / ] || die "no expo-build.config.json here or in any parent folder (see README)"
+      cd ..
+    done
+    load_config
+    # shellcheck source=/dev/null
+    source "$KIT_DIR/lib/cmd-$cmd.sh"
+    ;;
+  help|-h|--help) usage ;;
+  *) usage; exit 1 ;;
+esac
