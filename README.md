@@ -102,7 +102,18 @@ Install the slash commands in Claude Code:
    - **`dev-variant`** is optional. It gives the debug build its own application id (`<package>.dev`) and the name "`<name> (Dev)`", so `dev` installs next to the release app instead of replacing it. Services registered per package id (Firebase, Google Sign-In, Play Billing) won't recognize the suffixed id unless you register it there too.
    - **`update-channel`** is needed for OTA hotfixes with `expo-updates`. It writes the `expo-channel-name` header into the binary at prebuild time. Local builds have no EAS Build to set it.
 
-4. **Optionally add npm scripts**, e.g. `"build:install": "expo-build install"`, or just use `npx expo-build`.
+4. **Add a root shortcut** (optional). An executable `expo-build` file at the repo root gives the same command in every project (`./expo-build install patch apk`), even when the app is in a subfolder. Set the `cd` line to the app's folder (`.` when the app is at the root):
+
+   ```bash
+   #!/usr/bin/env bash
+   set -euo pipefail
+   cd "$(dirname "$0")/frontend"
+   bin=node_modules/.bin/expo-build
+   [ -x "$bin" ] || { echo "expo-build-kit isn't installed in $(pwd) — run npm install there first" >&2; exit 1; }
+   exec "$bin" "$@"
+   ```
+
+   Don't use `npx expo-build` from a folder where the kit isn't installed: npx would look for an `expo-build` package on the npm registry instead.
 
 5. **Gitignore** `builds/`, `android/`, `ios/`, `keystores/` and `.env*.local`.
 
