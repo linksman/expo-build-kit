@@ -85,7 +85,7 @@ Install the slash commands in Claude Code:
    | `requiredFiles` | `[]` | Files that must exist before building (e.g. `google-services.json`). |
    | `nativePaths` | `[]` | Extra paths (beyond the defaults above) whose change blocks a hotfix. |
    | `tagPrefix` | `v` | Release tags are `<tagPrefix><version>`. Use e.g. `mobile-v` when other parts of the repo are tagged too. |
-   | `envFile` | `.env.local` | Sourced for `playstore` (keystore passwords) and `hotfix` (`EXPO_PUBLIC_*`, Sentry). |
+   | `envFile` | `.env.local` | Loaded before `install`, `playstore` and `hotfix` run Gradle or EAS: `EXPO_PUBLIC_*` keys, build-time credentials such as Sentry's (its Gradle plugin uploads source maps in every release build and fails without `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN`), and the keystore passwords. |
    | `artifactName` | `expo.slug` | Prefix of the artifact file names. |
 
 3. **Add the plugins you need** to `app.json`:

@@ -34,12 +34,7 @@ run_checks
 
 # EXPO_PUBLIC_* keys (and Sentry credentials, if any) for the bundle, plus a
 # build name so a running OTA bundle can be traced to its commit.
-if [ -f "$ENV_FILE" ]; then
-  set -a
-  # shellcheck source=/dev/null
-  source "$ENV_FILE"
-  set +a
-fi
+load_env_file
 export EXPO_UPDATES_CHANNEL="$channel"
 commit=$(git -C "$REPO_ROOT" rev-parse --short HEAD)
 timestamp=$(date +%Y%m%d-%H%M)

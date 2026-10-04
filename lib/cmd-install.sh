@@ -20,6 +20,8 @@ run_checks
 android_env
 require_single_device
 
+load_env_file
+
 commit=$(git -C "$REPO_ROOT" rev-parse --short HEAD)
 n=$(next_build_number)
 (cd "$APP_DIR" && bump_app_json "$version" "$n")

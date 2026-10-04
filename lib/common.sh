@@ -47,6 +47,20 @@ run_checks() {
   done
 }
 
+# Exports every variable in the env file (when it exists): EXPO_PUBLIC_* keys
+# for the JS bundle, build-time credentials such as SENTRY_ORG / SENTRY_PROJECT /
+# SENTRY_AUTH_TOKEN (Sentry's Gradle plugin uploads source maps in every release
+# build and fails without them), and the keystore passwords. The Expo CLI
+# auto-loads .env files, but a bare ./gradlew doesn't.
+load_env_file() {
+  if [ -f "$ENV_FILE" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "$ENV_FILE"
+    set +a
+  fi
+}
+
 android_env() {
   # shellcheck source=android-env.sh
   source "$KIT_DIR/lib/android-env.sh"

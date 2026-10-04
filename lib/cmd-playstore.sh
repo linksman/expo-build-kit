@@ -4,8 +4,7 @@
 # Console. Listens on the `production` update channel. Needs the play-signing
 # plugin in app.json; the keystore passwords come from the env file
 # (PLAY_RELEASE_STORE_PASSWORD / PLAY_RELEASE_KEY_PASSWORD, optionally
-# PLAY_RELEASE_KEY_ALIAS) — the Expo CLI auto-loads it, but a bare ./gradlew
-# doesn't, and build.gradle reads them via System.getenv().
+# PLAY_RELEASE_KEY_ALIAS), which build.gradle reads via System.getenv().
 
 usage="usage: expo-build playstore <major|minor|patch|no_change>   (current version: $APP_VERSION)"
 version="$(next_version "${1:-}")" || die "$usage"
@@ -32,10 +31,7 @@ timestamp=$(date +%Y%m%d-%H%M)
 export EXPO_PUBLIC_BUILD_NAME="${n}-${version}-${commit}-${timestamp}-playstore"
 echo "Building $EXPO_PUBLIC_BUILD_NAME"
 
-set -a
-# shellcheck source=/dev/null
-source "$ENV_FILE"
-set +a
+load_env_file
 export PLAY_STORE_SIGNING=true
 
 prebuild production
