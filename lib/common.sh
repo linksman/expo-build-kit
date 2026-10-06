@@ -38,13 +38,61 @@ require_files() {
   done
 }
 
-# The project's own gates (expo-build.config.json "checks"), run in the app folder.
+# The project's own gates (expo-build.config.json "checks"), run in the app folder,
+# then the CI gate when "ciWorkflow" is set.
 run_checks() {
   local c
   for c in ${CHECKS[@]+"${CHECKS[@]}"}; do
     echo "→ $c"
     (cd "$APP_DIR" && bash -c "$c")
   done
+  [ -z "$CI_WORKFLOW" ] || require_ci_green
+}
+
+# The commit whose CI result stands for HEAD: HEAD itself, minus any trailing
+# kit "Bump …" commits that touched only app.json — so back-to-back builds don't
+# wait for a full CI rerun of a version bump.
+ci_commit() {
+  local sha app_json
+  if [ "$APP_REL" = . ]; then app_json=app.json; else app_json="$APP_REL/app.json"; fi
+  sha=$(git -C "$REPO_ROOT" rev-parse HEAD)
+  while git -C "$REPO_ROOT" log -1 --format=%s "$sha" | grep -qE '^Bump (version|build) to ' \
+    && [ "$(git -C "$REPO_ROOT" diff-tree --no-commit-id --name-only -r "$sha")" = "$app_json" ]; do
+    sha=$(git -C "$REPO_ROOT" rev-parse "${sha}^")
+  done
+  echo "$sha"
+}
+
+# Instead of re-running the tests locally: HEAD must be pushed and the
+# "ciWorkflow" GitHub Actions workflow must have passed on it. A run still in
+# progress is watched until it finishes. Needs the gh CLI, logged in.
+require_ci_green() {
+  local wf="$CI_WORKFLOW" sha run status conclusion upstream
+  [ -f "$REPO_ROOT/.github/workflows/$wf" ] || die "ciWorkflow \"$wf\" not found in .github/workflows/"
+  command -v gh >/dev/null || die "ciWorkflow needs the GitHub CLI (gh) — brew install gh && gh auth login"
+  upstream=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) \
+    || die "branch has no upstream — push it first so CI can run"
+  git -C "$REPO_ROOT" fetch -q "${upstream%%/*}"
+  [ -z "$(git -C "$REPO_ROOT" rev-list "${upstream}..HEAD")" ] \
+    || die "HEAD isn't pushed to ${upstream} — push it and let CI run first"
+
+  sha=$(ci_commit)
+  echo "→ CI ($wf) on ${sha:0:7}"
+  run=$(cd "$REPO_ROOT" && gh run list --workflow "$wf" --commit "$sha" --limit 1 \
+    --json databaseId,status,conclusion --jq '.[0] | "\(.databaseId) \(.status) \(.conclusion)"')
+  [ -n "$run" ] || die "no $wf run for ${sha:0:7} yet — wait for GitHub to start it (or run it via workflow_dispatch)"
+  read -r run status conclusion <<< "$run"
+
+  if [ "$status" != completed ]; then
+    echo "CI run $run is $status — waiting for it to finish…"
+    (cd "$REPO_ROOT" && gh run watch "$run" --compact --interval 15 >/dev/null) || true
+    conclusion=$(cd "$REPO_ROOT" && gh run view "$run" --json conclusion --jq .conclusion)
+  fi
+  if [ "$conclusion" != success ]; then
+    (cd "$REPO_ROOT" && gh run view "$run" --json url --jq .url) >&2 || true
+    die "CI run $run on ${sha:0:7} finished with \"$conclusion\" — fix it before building"
+  fi
+  echo "CI passed (run $run)."
 }
 
 # Exports every variable in the env file (when it exists): EXPO_PUBLIC_* keys

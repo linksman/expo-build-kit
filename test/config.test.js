@@ -45,10 +45,22 @@ test('root app: defaults', () => {
   assert.equal(vars.BUILDS_DIR, '/repo/builds');
   assert.equal(vars.TAG_PREFIX, 'v');
   assert.deepEqual(vars.CHECKS, []);
+  assert.equal(vars.CI_WORKFLOW, '');
   assert.equal(vars.DEV_SUFFIX, '');
   assert.equal(vars.HAS_UPDATES, 1);
   assert.equal(vars.HAS_SENTRY, 1);
   assert.ok(vars.NATIVE_PATHS.includes('app.json'));
+});
+
+test('ciWorkflow passes through', () => {
+  const { vars, warnings } = resolveConfig({
+    config: { ciWorkflow: 'ci.yml' },
+    appDir: '/r', repoRoot: '/r',
+    appJson: { expo: { slug: 's', version: '1.0.0' } },
+    packageJson: {},
+  });
+  assert.deepEqual(warnings, []);
+  assert.equal(vars.CI_WORKFLOW, 'ci.yml');
 });
 
 test('unknown config keys produce a warning', () => {

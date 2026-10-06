@@ -22,7 +22,7 @@ Run from the Expo app's folder (the one with `expo-build.config.json`):
 **`install` and `playstore`** run these steps in order:
 1. Check the working tree is clean.
 2. Check the required files exist.
-3. Run your checks.
+3. Run your checks, and/or confirm CI passed on HEAD (`ciWorkflow`).
 4. Bump `expo.version` and `expo.android.versionCode` in `app.json`. The build number is a shared counter in `<buildsDir>/.build_number`.
 5. Run prebuild and the Gradle build.
 6. Copy the artifact to `buildsDir`.
@@ -81,6 +81,7 @@ Install the slash commands in Claude Code:
    | Key | Default | Meaning |
    |---|---|---|
    | `checks` | `[]` | Shell commands run in the app folder before `install`, `playstore` and `hotfix`. Any failure stops the run before anything is bumped. |
+   | `ciWorkflow` | — | A GitHub Actions workflow file in `.github/workflows/` (e.g. `ci.yml`). When set, `install`, `playstore` and `hotfix` require HEAD to be pushed and that workflow's latest run on it to have succeeded, instead of re-running the tests locally. A run still in progress is watched until it finishes. Trailing kit `Bump …` commits that only touch `app.json` are skipped back to the commit before them, so back-to-back builds don't wait for CI on a version bump. Needs the `gh` CLI, logged in. Use it only when that workflow runs every test you'd otherwise list in `checks`. It can be combined with `checks` (they run first). |
    | `buildsDir` | `builds` | Where artifacts and the `.build_number` counter go. In a monorepo, `../builds` keeps them at the repo root. |
    | `requiredFiles` | `[]` | Files that must exist before building (e.g. `google-services.json`). |
    | `nativePaths` | `[]` | Extra paths (beyond the defaults above) whose change blocks a hotfix. |
