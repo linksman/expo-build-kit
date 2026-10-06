@@ -18,16 +18,17 @@ Run from the Expo app's folder (the one with `expo-build.config.json`):
 | `npx expo-build playstore <major\|minor\|patch\|no_change>` | Release AAB signed with the upload key, for Play Console. `production` update channel. |
 | `npx expo-build dev [open]` | Debug build with `expo-dev-client` that loads JS live from Metro. `open` skips the build and just reconnects. |
 | `npx expo-build hotfix <preview\|production> "<message>"` | JS-only EAS Update to installed builds of the current version. |
+| `npx expo-build secrets` | Uploads the env file and Play keystore as GitHub Actions secrets, for [building in GitHub Actions](#building-in-github-actions). |
 
 **`install` and `playstore`** run these steps in order:
 1. Check the working tree is clean.
 2. Check the required files exist.
 3. Run your checks, and/or confirm CI passed on HEAD (`ciWorkflow`).
-4. Bump `expo.version` and `expo.android.versionCode` in `app.json`. The build number is a shared counter in `<buildsDir>/.build_number`.
+4. Bump `expo.version` and `expo.android.versionCode` in `app.json`. The build number is the committed `versionCode` + 1, so local and CI builds share one sequence.
 5. Run prebuild and the Gradle build.
 6. Copy the artifact to `buildsDir`.
 7. For `install`: install it on the device. For `playstore`: fail if the AAB is debug-signed.
-8. Commit `app.json`, tag `<tagPrefix><version>`, and push both.
+8. Commit `app.json`, tag `<tagPrefix><version>` on that commit, and push both. If the branch moved on meanwhile, the bump is rebased onto it; the tag stays on the commit that was built.
 
 **`hotfix`** refuses to publish when anything native-affecting changed since the current version's tag:
 - dependencies and lockfiles
@@ -82,7 +83,7 @@ Install the slash commands in Claude Code:
    |---|---|---|
    | `checks` | `[]` | Shell commands run in the app folder before `install`, `playstore` and `hotfix`. Any failure stops the run before anything is bumped. |
    | `ciWorkflow` | — | A GitHub Actions workflow file in `.github/workflows/` (e.g. `ci.yml`). When set, `install`, `playstore` and `hotfix` require HEAD to be pushed and that workflow's latest run on it to have succeeded, instead of re-running the tests locally. A run still in progress is watched until it finishes. Trailing kit `Bump …` commits that only touch `app.json` are skipped back to the commit before them, so back-to-back builds don't wait for CI on a version bump. Needs the `gh` CLI, logged in. Use it only when that workflow runs every test you'd otherwise list in `checks`. It can be combined with `checks` (they run first). |
-   | `buildsDir` | `builds` | Where artifacts and the `.build_number` counter go. In a monorepo, `../builds` keeps them at the repo root. |
+   | `buildsDir` | `builds` | Where artifacts go. In a monorepo, `../builds` keeps them at the repo root. |
    | `requiredFiles` | `[]` | Files that must exist before building (e.g. `google-services.json`). |
    | `nativePaths` | `[]` | Extra paths (beyond the defaults above) whose change blocks a hotfix. |
    | `tagPrefix` | `v` | Release tags are `<tagPrefix><version>`. Use e.g. `mobile-v` when other parts of the repo are tagged too. |
@@ -136,6 +137,20 @@ You need four things:
 - an EAS project you're logged into (`npx eas login`)
 
 Builds made before you add the plugin carry no channel and can't receive updates.
+
+## Building in GitHub Actions
+
+`templates/build.yml` is a workflow that builds on request only: the repo's **Actions** tab → **Build** → **Run workflow**, then pick the type (`install-apk`, `install-aab`, `playstore`, `dev`) and the version bump. The APK or AAB is attached to the run, unzipped, for 90 days.
+
+It runs the same commands as a local build with `EXPO_BUILD_CI=1`, which skips everything that needs a phone: `install` and `dev` only build and copy the artifact into `buildsDir`. Bumping, committing, tagging and pushing work as they do locally, done by `github-actions[bot]`. Versioned builds must run from the default branch; `dev` can run from any branch and skips the version bump. One build runs at a time.
+
+To set it up:
+1. Copy `node_modules/expo-build-kit/templates/build.yml` to `.github/workflows/build.yml`. It calls the root `./expo-build` shortcut, and uploads from `builds/`; adjust both if your app or `buildsDir` is elsewhere.
+2. Run `npx expo-build secrets`. It stores the env file as `ENV_LOCAL` and `keystores/release.jks` as `PLAY_KEYSTORE_BASE64`. Re-run it whenever either changes.
+3. Set `ciWorkflow` too, so versioned builds wait for a passed CI run instead of running the tests in the build job. Without it, the build job runs `checks`.
+4. If the default branch is protected, allow GitHub Actions to push to it.
+
+After installing a CI `dev` build, connect it to Metro locally with `expo-build dev open`.
 
 ## Development
 

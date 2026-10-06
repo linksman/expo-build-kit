@@ -30,6 +30,7 @@ test('monorepo app: paths resolve relative to the app folder', () => {
   assert.equal(vars.ARTIFACT_NAME, 'box-signal');
   assert.equal(vars.DEV_SUFFIX, '.debug');
   assert.equal(vars.HAS_DEV_CLIENT, 1);
+  assert.equal(vars.VERSION_CODE, 0);
   assert.equal(vars.HAS_UPDATES, 0);
 });
 
@@ -38,12 +39,13 @@ test('root app: defaults', () => {
     config: {},
     appDir: '/repo',
     repoRoot: '/repo',
-    appJson: { expo: { slug: 's', version: '1.0.0', android: { package: 'p' } } },
+    appJson: { expo: { slug: 's', version: '1.0.0', android: { package: 'p', versionCode: 42 } } },
     packageJson: { dependencies: { 'expo-updates': '1', '@sentry/react-native': '1' } },
   });
   assert.equal(vars.APP_REL, '.');
   assert.equal(vars.BUILDS_DIR, '/repo/builds');
   assert.equal(vars.TAG_PREFIX, 'v');
+  assert.equal(vars.VERSION_CODE, 42);
   assert.deepEqual(vars.CHECKS, []);
   assert.equal(vars.CI_WORKFLOW, '');
   assert.equal(vars.DEV_SUFFIX, '');

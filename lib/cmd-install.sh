@@ -6,6 +6,9 @@
 # splash screen without one — that's what `expo-build dev` is for). Listens on
 # the `preview` update channel, so `expo-build hotfix preview` reaches it but
 # production hotfixes never do.
+#
+# With EXPO_BUILD_CI=1 (a CI build) there's no device: the artifact is only
+# copied into buildsDir.
 
 usage="usage: expo-build install <major|minor|patch|no_change> <apk|aab>   (current version: $APP_VERSION)"
 version="$(next_version "${1:-}")" || die "$usage"
@@ -18,7 +21,7 @@ require_clean_tree
 require_files
 run_checks
 android_env
-require_single_device
+ci_mode || require_single_device
 
 load_env_file
 
@@ -40,7 +43,9 @@ cp "$(release_output "$format")" "$out"
 # adb can't take an .aab, so derive a device-specific APK set with bundletool
 # (already in Gradle's cache via AGP). The release build type signs with the
 # debug keystore, hence those --ks values.
-if [ "$format" = apk ]; then
+if ci_mode; then
+  :
+elif [ "$format" = apk ]; then
   adb install -r "$out"
 else
   bundletool_jar=$(find ~/.gradle/caches/modules-2/files-2.1/com.android.tools.build/bundletool -name 'bundletool-*.jar' | sort -V | tail -1)
@@ -53,4 +58,4 @@ else
 fi
 
 commit_tag_push "$version" "$APP_VERSION" "$n"
-echo "Done: $out (installed)"
+if ci_mode; then echo "Done: $out"; else echo "Done: $out (installed)"; fi

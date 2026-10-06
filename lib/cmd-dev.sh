@@ -10,6 +10,9 @@
 #
 # No version bump, tag, or clean-tree/check gates: a throwaway build, never
 # distributed.
+#
+# With EXPO_BUILD_CI=1 (a CI build) it only builds and copies the APK into
+# buildsDir; install it, then run `expo-build dev open` locally.
 
 mode="${1:-build}"
 case "$mode" in build|open) ;; *) die "usage: expo-build dev [open]" ;; esac
@@ -19,8 +22,11 @@ case "$mode" in build|open) ;; *) die "usage: expo-build dev [open]" ;; esac
 port="${METRO_PORT:-8081}"
 package="${ANDROID_PACKAGE}${DEV_SUFFIX}"
 
+if ci_mode; then
+  [ "$mode" = build ] || die "dev open needs a device — run it locally"
+fi
 android_env
-require_single_device
+ci_mode || require_single_device
 
 if [ "$mode" = build ]; then
   prebuild preview
@@ -29,6 +35,7 @@ if [ "$mode" = build ]; then
   mkdir -p "$BUILDS_DIR"
   out="$BUILDS_DIR/${ARTIFACT_NAME}-dev-$(git -C "$REPO_ROOT" rev-parse --short HEAD)-$(date +%Y%m%d-%H%M).apk"
   cp "$APP_DIR/android/app/build/outputs/apk/debug/app-debug.apk" "$out"
+  if ci_mode; then echo "Done: $out"; exit 0; fi
   adb install -r "$out"
   echo "Installed $out"
 fi

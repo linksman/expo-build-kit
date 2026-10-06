@@ -124,15 +124,19 @@ require_single_device() {
   fi
 }
 
-# Shared counter across install and playstore builds. versionCode must go up
-# every build: Android silently refuses to replace an installed app with the
-# same or lower versionCode.
+# The committed app.json versionCode + 1, so builds on this machine and in CI
+# share one sequence. versionCode must go up every build: Android silently
+# refuses to replace an installed app with the same or lower versionCode. The
+# pre-0.3 <buildsDir>/.build_number counter is still honored if it's ahead.
 next_build_number() {
-  mkdir -p "$BUILDS_DIR"
-  local n=$(( $(cat "$BUILDS_DIR/.build_number" 2>/dev/null || echo 0) + 1 ))
-  echo "$n" > "$BUILDS_DIR/.build_number"
-  echo "$n"
+  local legacy
+  legacy=$(cat "$BUILDS_DIR/.build_number" 2>/dev/null || echo 0)
+  echo $(( (VERSION_CODE > legacy ? VERSION_CODE : legacy) + 1 ))
 }
+
+# EXPO_BUILD_CI=1 (set by a GitHub Actions build workflow): build and copy the
+# artifact into buildsDir only — no device, no install, no Metro.
+ci_mode() { [ "${EXPO_BUILD_CI:-}" = 1 ]; }
 
 # bump_app_json <version> <versionCode> — edits only those two values.
 bump_app_json() {
@@ -181,12 +185,21 @@ commit_tag_push() {
     git add "$app_json"
     if [ "$version" = "$old" ]; then git commit -m "Bump build to ${n}"
     else git commit -m "Bump version to ${version} (build ${n})"; fi
-    git push origin "$(git rev-parse --abbrev-ref HEAD)"
+    local branch new_tag=0
+    branch=$(git rev-parse --abbrev-ref HEAD)
+    # Tagged before pushing, so the tag stays on the exact commit that was built
+    # even if the bump has to be rebased below.
     if ! git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
-      git tag "$tag"
-      git push origin "$tag"
+      git tag "$tag"; new_tag=1
     else
       echo "Tag ${tag} already exists — left in place."
     fi
+    # The branch may have moved on during a long build (e.g. a CI build while
+    # you kept pushing): rebase the one-file bump onto it and push again.
+    if ! git push origin "$branch"; then
+      git pull --rebase origin "$branch"
+      git push origin "$branch"
+    fi
+    [ "$new_tag" = 0 ] || git push origin "$tag"
   )
 }

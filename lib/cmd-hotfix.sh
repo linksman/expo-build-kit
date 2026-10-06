@@ -38,7 +38,7 @@ load_env_file
 export EXPO_UPDATES_CHANNEL="$channel"
 commit=$(git -C "$REPO_ROOT" rev-parse --short HEAD)
 timestamp=$(date +%Y%m%d-%H%M)
-build=$(cat "$BUILDS_DIR/.build_number" 2>/dev/null || echo 0)
+build="$VERSION_CODE"
 export EXPO_PUBLIC_BUILD_NAME="${build}-${version}-${commit}-${timestamp}-ota-${channel}"
 echo "Publishing $EXPO_PUBLIC_BUILD_NAME to channel '$channel' (runtime ${version})"
 

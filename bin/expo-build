@@ -28,6 +28,9 @@ usage: expo-build <command> [args]
       `open` skips the build and just reconnects/relaunches it.
   hotfix <preview|production> "<message>"
       JS-only over-the-air update (EAS Update) to installed builds.
+  secrets
+      Uploads the env file and Play keystore as GitHub Actions secrets,
+      for a CI build workflow (see README).
 
 Run from the Expo app's folder (the one with expo-build.config.json).
 USAGE
@@ -36,7 +39,7 @@ USAGE
 cmd="${1:-help}"
 [ $# -gt 0 ] && shift
 case "$cmd" in
-  install|playstore|dev|hotfix)
+  install|playstore|dev|hotfix|secrets)
     # Allow running from a subfolder of the app: walk up to the config file.
     while [ ! -f expo-build.config.json ]; do
       [ "$(pwd)" != / ] || die "no expo-build.config.json here or in any parent folder (see README)"
