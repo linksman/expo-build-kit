@@ -62,6 +62,13 @@ jobs:
           distribution: temurin
           java-version: 17 # newer JDKs fail React Native's Gradle plugin resolution
       - uses: gradle/actions/setup-gradle@v6 # caches ~/.gradle between builds
+      # The generated android/gradle.properties caps Metaspace at 512m, which a
+      # cold release build's lint over every library module runs out of
+      # (OutOfMemoryError: Metaspace). ~/.gradle/gradle.properties overrides it.
+      - name: Gradle memory
+        run: |
+          mkdir -p ~/.gradle
+          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=2g -Dfile.encoding=UTF-8" >> ~/.gradle/gradle.properties
       - run: npm ci
 
       - name: Write .env.local and the upload keystore
