@@ -18,7 +18,7 @@ Run from the Expo app's folder (the one with `expo-build.config.json`):
 | `npx expo-build playstore <major\|minor\|patch\|no_change>` | Release AAB signed with the upload key, for Play Console. `production` update channel. |
 | `npx expo-build dev [open]` | Debug build with `expo-dev-client` that loads JS live from Metro. `open` skips the build and just reconnects. |
 | `npx expo-build hotfix <preview\|production> "<message>"` | JS-only EAS Update to installed builds of the current version. |
-| `npx expo-build secrets` | Uploads the env file and Play keystore as GitHub Actions secrets, for [building in GitHub Actions](#building-in-github-actions). |
+| `npx expo-build secrets` | Uploads the env file, Play keystore and `requiredFiles` as GitHub Actions secrets, for [building in GitHub Actions](#building-in-github-actions). |
 
 **`install` and `playstore`** run these steps in order:
 1. Check the working tree is clean.
@@ -146,7 +146,7 @@ It runs the same commands as a local build with `EXPO_BUILD_CI=1`, which skips e
 
 To set it up:
 1. Copy `node_modules/expo-build-kit/templates/build.yml` to `.github/workflows/build.yml`. It calls the root `./expo-build` shortcut, and uploads from `builds/`; adjust both if your app or `buildsDir` is elsewhere.
-2. Run `npx expo-build secrets`. It stores the env file as `ENV_LOCAL` and `keystores/release.jks` as `PLAY_KEYSTORE_BASE64`. Re-run it whenever either changes.
+2. Run `npx expo-build secrets`. It stores the env file as `ENV_LOCAL`, `keystores/release.jks` as `PLAY_KEYSTORE_BASE64`, and each `requiredFiles` entry under its file name in upper case with non-alphanumerics as `_` (`google-services.json` → `GOOGLE_SERVICES_JSON`). Re-run it whenever any of them changes. The template doesn't write required files back: add a step that does, e.g. `printf '%s\n' "$GOOGLE_SERVICES_JSON" > google-services.json` with that secret in its `env`.
 3. Set `ciWorkflow` too, so versioned builds wait for a passed CI run instead of running the tests in the build job. Without it, the build job runs `checks`.
 4. If the default branch is protected, allow GitHub Actions to push to it.
 

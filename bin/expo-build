@@ -29,7 +29,7 @@ usage: expo-build <command> [args]
   hotfix <preview|production> "<message>"
       JS-only over-the-air update (EAS Update) to installed builds.
   secrets
-      Uploads the env file and Play keystore as GitHub Actions secrets,
+      Uploads the env file, Play keystore and requiredFiles as GitHub Actions secrets,
       for a CI build workflow (see README).
 
 Run from the Expo app's folder (the one with expo-build.config.json).

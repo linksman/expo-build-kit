@@ -6,7 +6,9 @@
 # passed ("ciWorkflow" in expo-build.config.json); dev builds don't.
 #
 # Secrets (set them with `./expo-build secrets`): ENV_LOCAL (the whole
-# .env.local) and PLAY_KEYSTORE_BASE64 (keystores/release.jks).
+# .env.local), PLAY_KEYSTORE_BASE64 (keystores/release.jks), and one per
+# requiredFiles entry (google-services.json → GOOGLE_SERVICES_JSON) — write
+# those back in the step below if the config lists any.
 name: Build
 
 on:
