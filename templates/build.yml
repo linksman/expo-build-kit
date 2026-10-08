@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   build:
-    uses: linksman/expo-build-kit/.github/workflows/build.yml@v0.5.0
+    uses: linksman/expo-build-kit/.github/workflows/build.yml@v0.5.1
     with:
       type: ${{ inputs.type }}
       bump: ${{ inputs.bump }}

@@ -99,6 +99,24 @@ jobs:
           mkdir -p ~/.gradle
           echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=2g -Dfile.encoding=UTF-8" >> ~/.gradle/gradle.properties
       - run: npm ci
+      # React Native's NDK isn't preinstalled on the runner, and Gradle downloads
+      # it in one try: a passing 502 from dl.google.com fails the whole build.
+      # Install it up front, with retries. An app that pins a different NDK still
+      # gets it from Gradle.
+      - name: Install the NDK
+        run: |
+          v=$(sed -n 's/^ndkVersion = "\(.*\)"/\1/p' node_modules/react-native/gradle/libs.versions.toml 2>/dev/null)
+          [ -n "$v" ] || { echo "No ndkVersion in react-native's libs.versions.toml — leaving it to Gradle"; exit 0; }
+          [ -d "$ANDROID_HOME/ndk/$v" ] && { echo "NDK $v is already installed"; exit 0; }
+          for attempt in 1 2 3 4 5; do
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$v" > /tmp/sdkmanager.log 2>&1 \
+              && [ -d "$ANDROID_HOME/ndk/$v" ] && { echo "Installed NDK $v"; exit 0; }
+            tail -5 /tmp/sdkmanager.log
+            echo "::warning::NDK $v download failed (attempt $attempt of 5)"
+            sleep $((attempt * 30))
+          done
+          echo "::error::Couldn't download NDK $v from dl.google.com — re-run the build later"
+          exit 1
 
       - name: Write the env file, required files and the upload keystore
         env:
