@@ -140,13 +140,15 @@ Builds made before you add the plugin carry no channel and can't receive updates
 
 ## Building in GitHub Actions
 
-`templates/build.yml` is a workflow that builds on request only: the repo's **Actions** tab → **Build** → **Run workflow**, then pick the type (`install-apk`, `install-aab`, `playstore`, `dev`) and the version bump. The APK or AAB is attached to the run, unzipped, for 90 days.
+The kit ships a reusable workflow, `.github/workflows/build.yml`, that builds on request only. Each app calls it from a short workflow (`templates/build.yml`): the repo's **Actions** tab → **Build** → **Run workflow**, then pick the type (`install-apk`, `install-aab`, `playstore`, `dev`) and the version bump. The APK or AAB is attached to the run, unzipped, for 90 days. Fixes to the build go into the kit's workflow, and every app picks them up when it bumps the tag it calls.
 
 It runs the same commands as a local build with `EXPO_BUILD_CI=1`, which skips everything that needs a phone: `install` and `dev` only build and copy the artifact into `buildsDir`. Bumping, committing, tagging and pushing work as they do locally, done by `github-actions[bot]`. Versioned builds must run from the default branch; `dev` can run from any branch and skips the version bump. One build runs at a time.
 
+It also handles the GitHub runner: it frees disk space (the runner starts with ~14 GB), allows 90 minutes (a cold build takes ~1h), raises Gradle's heap and Metaspace (the generated cap runs out in release lint), and builds only the ABIs each type needs (`arm64-v8a` for install/dev, plus `armeabi-v7a` for playstore).
+
 To set it up:
-1. Copy `node_modules/expo-build-kit/templates/build.yml` to `.github/workflows/build.yml`. It calls the root `./expo-build` shortcut, and uploads from `builds/`; adjust both if your app or `buildsDir` is elsewhere.
-2. Run `npx expo-build secrets`. It stores the env file as `ENV_LOCAL`, `keystores/release.jks` as `PLAY_KEYSTORE_BASE64`, and each `requiredFiles` entry under its file name in upper case with non-alphanumerics as `_` (`google-services.json` → `GOOGLE_SERVICES_JSON`). Re-run it whenever any of them changes. The template doesn't write required files back: add a step that does, e.g. `printf '%s\n' "$GOOGLE_SERVICES_JSON" > google-services.json` with that secret in its `env`.
+1. Copy `node_modules/expo-build-kit/templates/build.yml` to `.github/workflows/build.yml`. If the Expo app isn't at the repo root, set `app-dir` (e.g. `app-dir: frontend`). Keep the `@vX.Y.Z` tag in `uses:` the same as the kit version in `package.json`.
+2. Run `npx expo-build secrets`. It stores the env file as `ENV_LOCAL`, `keystores/release.jks` as `PLAY_KEYSTORE_BASE64`, and each `requiredFiles` entry under its file name in upper case with non-alphanumerics as `_` (`google-services.json` → `GOOGLE_SERVICES_JSON`). Re-run it whenever any of them changes. The workflow writes all of them back (to `envFile` and each `requiredFiles` path) before building; the caller passes them with `secrets: inherit`.
 3. Set `ciWorkflow` too, so versioned builds wait for a passed CI run instead of running the tests in the build job. Without it, the build job runs `checks`.
 4. If the default branch is protected, allow GitHub Actions to push to it.
 

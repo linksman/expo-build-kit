@@ -1,14 +1,10 @@
 # Builds an Android artifact on request — never on push. Actions tab → Build →
 # Run workflow, pick the type and version bump; the APK/AAB is attached to the
-# run (Artifacts, at the bottom of the run's page). Runs expo-build-kit exactly
-# like a local build (bump, commit, tag, push) with EXPO_BUILD_CI=1, which skips
-# the device steps. Install/playstore builds need the commit's CI run to have
-# passed ("ciWorkflow" in expo-build.config.json); dev builds don't.
+# run (Artifacts, at the bottom of the run's page).
 #
-# Secrets (set them with `./expo-build secrets`): ENV_LOCAL (the whole
-# .env.local), PLAY_KEYSTORE_BASE64 (keystores/release.jks), and one per
-# requiredFiles entry (google-services.json → GOOGLE_SERVICES_JSON) — write
-# those back in the step below if the config lists any.
+# The build itself is expo-build-kit's shared workflow, pinned to a kit tag
+# below (keep it the same as the kit's version in package.json). See the kit's
+# README, "Building in GitHub Actions". Secrets: `npx expo-build secrets`.
 name: Build
 
 on:
@@ -25,87 +21,15 @@ on:
         options: [no_change, patch, minor, major]
         default: no_change
 
-# One build at a time; another click waits for the running one.
-concurrency:
-  group: build
-  cancel-in-progress: false
-
 permissions:
   contents: write # push the version bump commit and tag
   actions: read # look up the commit's CI run
 
 jobs:
   build:
-    name: ${{ inputs.type }} (${{ inputs.type == 'dev' && 'no bump' || inputs.bump }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    env:
-      EXPO_BUILD_CI: 1
-      GH_TOKEN: ${{ github.token }}
-      TYPE: ${{ inputs.type }}
-      BUMP: ${{ inputs.bump }}
-    steps:
-      # Versioned builds bump, tag and push, so they stay on the default branch.
-      - name: Check branch
-        if: inputs.type != 'dev' && github.ref_name != github.event.repository.default_branch
-        run: |
-          echo "::error::$TYPE builds bump the version and tag — run them from ${{ github.event.repository.default_branch }}"
-          exit 1
-
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0 # tags, and the CI gate's walk past version-bump commits
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: 17 # newer JDKs fail React Native's Gradle plugin resolution
-      - uses: gradle/actions/setup-gradle@v6 # caches ~/.gradle between builds
-      # The generated android/gradle.properties caps Metaspace at 512m, which a
-      # cold release build's lint over every library module runs out of
-      # (OutOfMemoryError: Metaspace). ~/.gradle/gradle.properties overrides it.
-      - name: Gradle memory
-        run: |
-          mkdir -p ~/.gradle
-          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=2g -Dfile.encoding=UTF-8" >> ~/.gradle/gradle.properties
-      - run: npm ci
-
-      - name: Write .env.local and the upload keystore
-        env:
-          ENV_LOCAL: ${{ secrets.ENV_LOCAL }}
-          PLAY_KEYSTORE_BASE64: ${{ secrets.PLAY_KEYSTORE_BASE64 }}
-        run: |
-          [ -n "$ENV_LOCAL" ] || { echo "::error::ENV_LOCAL secret is missing — run ./expo-build secrets"; exit 1; }
-          printf '%s\n' "$ENV_LOCAL" > .env.local
-          if [ -n "$PLAY_KEYSTORE_BASE64" ]; then
-            mkdir -p keystores
-            printf '%s' "$PLAY_KEYSTORE_BASE64" | base64 -d > keystores/release.jks
-          fi
-
-      - name: Git identity and upstream
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git branch --set-upstream-to="origin/$GITHUB_REF_NAME"
-
-      - name: Build
-        run: |
-          case "$TYPE" in
-            install-apk) ./expo-build install "$BUMP" apk ;;
-            install-aab) ./expo-build install "$BUMP" aab ;;
-            playstore)   ./expo-build playstore "$BUMP" ;;
-            dev)         ./expo-build dev ;;
-          esac
-
-      - name: Find artifact
-        id: artifact
-        run: echo "path=$(ls builds/*.apk builds/*.aab 2>/dev/null | head -1)" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v7
-        with:
-          path: ${{ steps.artifact.outputs.path }}
-          archive: false # downloads as the .apk/.aab itself, not a zip
-          if-no-files-found: error
-          retention-days: 90
+    uses: linksman/expo-build-kit/.github/workflows/build.yml@v0.5.0
+    with:
+      type: ${{ inputs.type }}
+      bump: ${{ inputs.bump }}
+      # app-dir: frontend # when the Expo app isn't at the repo root
+    secrets: inherit

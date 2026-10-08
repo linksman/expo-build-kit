@@ -1,0 +1,167 @@
+# Reusable Android build for expo-build-kit apps. An app calls it from a short
+# workflow_dispatch workflow (templates/build.yml) and gets the APK/AAB attached
+# to the run (Artifacts, at the bottom of the run's page). Runs expo-build-kit
+# exactly like a local build (bump, commit, tag, push) with EXPO_BUILD_CI=1,
+# which skips the device steps. Install/playstore builds need the commit's CI
+# run to have passed when expo-build.config.json sets "ciWorkflow"; dev builds
+# don't.
+#
+# Secrets (the caller passes `secrets: inherit`; set them with
+# `npx expo-build secrets`): ENV_LOCAL (the whole .env.local),
+# PLAY_KEYSTORE_BASE64 (keystores/release.jks), and one per requiredFiles entry
+# in expo-build.config.json (google-services.json → GOOGLE_SERVICES_JSON),
+# written back to that file before the build.
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      type:
+        description: install-apk, install-aab, playstore or dev
+        type: string
+        required: true
+      bump:
+        description: no_change, patch, minor or major (ignored for dev)
+        type: string
+        default: no_change
+      app-dir:
+        description: The app's directory in the repo (where package.json and expo-build.config.json are)
+        type: string
+        default: .
+
+jobs:
+  build:
+    name: ${{ inputs.type }} (${{ inputs.type == 'dev' && 'no bump' || inputs.bump }})
+    runs-on: ubuntu-latest
+    # The caller grants these too (a called workflow can't raise them).
+    permissions:
+      contents: write # push the version bump commit and tag
+      actions: read # look up the commit's CI run
+    timeout-minutes: 90 # a cold build takes ~1h
+    # One build at a time; another click waits for the running one.
+    concurrency:
+      group: build
+      cancel-in-progress: false
+    env:
+      EXPO_BUILD_CI: 1
+      GH_TOKEN: ${{ github.token }}
+      TYPE: ${{ inputs.type }}
+      BUMP: ${{ inputs.bump }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.app-dir }}
+    steps:
+      # Versioned builds bump, tag and push, so they stay on the default branch.
+      - name: Check inputs and branch
+        working-directory: .
+        run: |
+          case "$TYPE" in
+            install-apk|install-aab|playstore|dev) ;;
+            *) echo "::error::Unknown build type '$TYPE' (install-apk, install-aab, playstore or dev)"; exit 1 ;;
+          esac
+          if [ "$TYPE" != dev ] && [ "$GITHUB_REF_NAME" != "${{ github.event.repository.default_branch }}" ]; then
+            echo "::error::$TYPE builds bump the version and tag — run them from ${{ github.event.repository.default_branch }}"
+            exit 1
+          fi
+
+      # The runner starts with ~14 GB free, and a native build (React Native
+      # Firebase, reanimated, one compile per ABI) can run out ("No space left on
+      # device"). Drop the preinstalled toolchains this build never uses; the
+      # Android SDK stays.
+      - name: Free disk space
+        working-directory: .
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift \
+            /usr/local/share/boost /usr/local/lib/node_modules /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/powershell /usr/share/miniconda /opt/microsoft /opt/google/chrome
+          sudo docker image prune --all --force > /dev/null
+          df -h /
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # tags, and the CI gate's walk past version-bump commits
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ${{ inputs.app-dir }}/package-lock.json
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17 # newer JDKs fail React Native's Gradle plugin resolution
+      - uses: gradle/actions/setup-gradle@v6 # caches ~/.gradle between builds
+      # The generated android/gradle.properties caps Metaspace at 512m, which a
+      # cold release build's lint over every library module runs out of
+      # (OutOfMemoryError: Metaspace). ~/.gradle/gradle.properties overrides it.
+      - name: Gradle memory
+        run: |
+          mkdir -p ~/.gradle
+          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=2g -Dfile.encoding=UTF-8" >> ~/.gradle/gradle.properties
+      - run: npm ci
+
+      - name: Write the env file, required files and the upload keystore
+        env:
+          SECRETS: ${{ toJSON(secrets) }}
+        run: |
+          secret() { jq -r --arg k "$1" '.[$k] // empty' <<<"$SECRETS"; }
+          config() { jq -r "$1" expo-build.config.json 2>/dev/null || true; }
+          env_local=$(secret ENV_LOCAL)
+          [ -n "$env_local" ] || { echo "::error::ENV_LOCAL secret is missing — run npx expo-build secrets (and pass secrets: inherit)"; exit 1; }
+          env_file=$(config '.envFile // ".env.local"')
+          printf '%s\n' "$env_local" > "${env_file:-.env.local}"
+          # requiredFiles: google-services.json → GOOGLE_SERVICES_JSON, named as `expo-build secrets` names them.
+          mapfile -t files < <(config '.requiredFiles // [] | .[]')
+          for file in ${files[@]+"${files[@]}"}; do
+            name=$(basename "$file" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g')
+            value=$(secret "$name")
+            [ -n "$value" ] || { echo "::error::$name secret (for $file) is missing — run npx expo-build secrets"; exit 1; }
+            mkdir -p "$(dirname "$file")"
+            printf '%s\n' "$value" > "$file"
+          done
+          keystore=$(secret PLAY_KEYSTORE_BASE64)
+          if [ -n "$keystore" ]; then
+            mkdir -p keystores
+            printf '%s' "$keystore" | base64 -d > keystores/release.jks
+          fi
+
+      - name: Git identity and upstream
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git branch --set-upstream-to="origin/$GITHUB_REF_NAME"
+
+      - name: Build
+        id: build
+        run: |
+          # expo-build-kit's release commands expect the output directory to exist.
+          builds=$(jq -r '.buildsDir // "builds"' expo-build.config.json 2>/dev/null || echo builds)
+          mkdir -p "$builds"
+          echo "builds=$(cd "$builds" && pwd)" >> "$GITHUB_OUTPUT"
+          # The C++ (reanimated, Firebase, the app) is compiled once per ABI, and
+          # that is most of the build time. Install and dev builds only need the
+          # phone's arm64; Play builds keep 32-bit ARM for older phones and drop
+          # x86/x86_64 (emulators, Chromebooks). Overrides gradle.properties.
+          case "$TYPE" in
+            install-*|dev) export ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a ;;
+            playstore)     export ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a,armeabi-v7a ;;
+          esac
+          bin=node_modules/.bin/expo-build
+          case "$TYPE" in
+            install-apk) "$bin" install "$BUMP" apk ;;
+            install-aab) "$bin" install "$BUMP" aab ;;
+            playstore)   "$bin" playstore "$BUMP" ;;
+            dev)         "$bin" dev ;;
+          esac
+
+      - name: Find artifact
+        id: artifact
+        env:
+          BUILDS: ${{ steps.build.outputs.builds }}
+        run: echo "path=$(ls "$BUILDS"/*.apk "$BUILDS"/*.aab 2>/dev/null | head -1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.artifact.outputs.path }}
+          archive: false # downloads as the .apk/.aab itself, not a zip
+          if-no-files-found: error
+          retention-days: 90
