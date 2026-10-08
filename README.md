@@ -6,7 +6,7 @@ It comes in three parts:
 
 - **`expo-build` CLI**: the commands, as bash scripts. Works from any terminal.
 - **Config plugins** that the commands rely on: release signing, a separate dev-build app id, and the OTA update channel.
-- **A Claude Code plugin**: `/build-install`, `/build-playstore`, `/build-development` and `/publish-hotfix` slash commands that ask for the arguments, run the CLI and report.
+- **A Claude Code plugin**: `/build-install`, `/build-playstore`, `/build-development` and `/publish-hotfix` slash commands that ask for the arguments, run the CLI and report. It also has `/commit-push` (runs the app's `npm run check`, then commits with a generated message and pushes) and `/commit-message` (previews that message), so projects don't keep their own copies.
 
 ## Commands
 

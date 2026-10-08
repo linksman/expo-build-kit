@@ -4,13 +4,13 @@
     "name": "Guy Linksman"
   },
   "metadata": {
-    "description": "Build/install/Play Store/OTA-hotfix slash commands for Expo apps using expo-build-kit"
+    "description": "Build/install/Play Store/OTA-hotfix and commit slash commands for Expo apps using expo-build-kit"
   },
   "plugins": [
     {
       "name": "expo-build-kit",
       "source": "./claude-plugin",
-      "description": "Thin slash commands around the expo-build CLI: /build-install, /build-playstore, /build-development, /publish-hotfix"
+      "description": "Thin slash commands around the expo-build CLI: /build-install, /build-playstore, /build-development, /publish-hotfix, plus /commit-push and /commit-message"
     }
   ]
 }
