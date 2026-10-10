@@ -1,6 +1,6 @@
 {
   "name": "expo-build-kit",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Slash commands that run the expo-build CLI (from the expo-build-kit npm dependency) in Expo projects set up with expo-build.config.json",
   "author": { "name": "Guy Linksman" },
   "repository": "https://github.com/linksman/expo-build-kit"

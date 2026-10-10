@@ -178,4 +178,4 @@ One-time setup per app:
 npm test   # unit tests for the config resolver and the Gradle/app.json transforms
 ```
 
-To release, bump `version` in `package.json` and `claude-plugin/.claude-plugin/plugin.json`, then tag `v<version>`. Projects pin a tag, so changes reach them only when they update the pin.
+To release, bump `version` in `package.json` and `claude-plugin/.claude-plugin/plugin.json` and the `@v<version>` in `templates/build.yml`, then tag `v<version>`. Projects pin a tag, so changes reach them only when they update the pin.
