@@ -1,6 +1,8 @@
 # Builds an Android artifact on request — never on push. Actions tab → Build →
 # Run workflow, pick the type and version bump; the APK/AAB is attached to the
-# run (Artifacts, at the bottom of the run's page).
+# run (Artifacts, at the bottom of the run's page). A playstore build can also
+# go straight to a Google Play track (play_track); that needs the
+# PLAY_SERVICE_ACCOUNT_JSON secret (`npx expo-build secrets <key.json>`).
 #
 # The build itself is expo-build-kit's shared workflow, pinned to a kit tag
 # below (keep it the same as the kit's version in package.json). See the kit's
@@ -20,6 +22,11 @@ on:
         type: choice
         options: [no_change, patch, minor, major]
         default: no_change
+      play_track:
+        description: Upload to Google Play (playstore builds only). Production goes up as a draft to release from Play Console.
+        type: choice
+        options: [none, internal, alpha, beta, production]
+        default: none
 
 permissions:
   contents: write # push the version bump commit and tag
@@ -31,5 +38,6 @@ jobs:
     with:
       type: ${{ inputs.type }}
       bump: ${{ inputs.bump }}
+      play-track: ${{ inputs.play_track }}
       # app-dir: frontend # when the Expo app isn't at the repo root
     secrets: inherit

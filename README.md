@@ -18,7 +18,7 @@ Run from the Expo app's folder (the one with `expo-build.config.json`):
 | `npx expo-build playstore <major\|minor\|patch\|no_change>` | Release AAB signed with the upload key, for Play Console. `production` update channel. |
 | `npx expo-build dev [open]` | Debug build with `expo-dev-client` that loads JS live from Metro. `open` skips the build and just reconnects. |
 | `npx expo-build hotfix <preview\|production> "<message>"` | JS-only EAS Update to installed builds of the current version. |
-| `npx expo-build secrets` | Uploads the env file, Play keystore and `requiredFiles` as GitHub Actions secrets, for [building in GitHub Actions](#building-in-github-actions). |
+| `npx expo-build secrets [play-key.json]` | Uploads the env file, Play keystore and `requiredFiles` as GitHub Actions secrets, for [building in GitHub Actions](#building-in-github-actions). With a Google Play service-account key, also stores it for [uploading to Google Play](#uploading-to-google-play). |
 
 **`install` and `playstore`** run these steps in order:
 1. Check the working tree is clean.
@@ -153,6 +153,24 @@ To set it up:
 4. If the default branch is protected, allow GitHub Actions to push to it.
 
 After installing a CI `dev` build, connect it to Metro locally with `expo-build dev open`.
+
+### Uploading to Google Play
+
+A `playstore` build can go straight to a Google Play track. Pick `play_track` when running the workflow: `internal`, `alpha` (closed testing), `beta` (open testing) or `production`. It's `none` by default, so nothing is uploaded. After the build, an `upload` job takes the run's AAB and publishes it with [r0adkll/upload-google-play](https://github.com/r0adkll/upload-google-play):
+- testing tracks roll out to their testers straight away;
+- production is uploaded as a **draft**, which you release from Play Console;
+- the package name comes from `expo.android.package` in `app.json`; apps with `app.config.js` pass `package-name` in their workflow;
+- a custom closed-testing track can be uploaded to by adding its exact name to the template's `play_track` options;
+- the AAB carries the R8 mapping file, so Play deobfuscates crashes without a separate upload.
+
+The build job checks before building that the type is `playstore` and the secret exists, so a mistake fails in seconds, not after an hour.
+
+One-time setup per app:
+1. **Upload the first release by hand.** Google only accepts API uploads for an app that already has one.
+2. **Google Cloud:** in any project, enable the **Google Play Android Developer API** and create a service account, e.g. `play-publisher`, with a JSON key. Keep it separate from any service account your backend uses: this one can publish releases.
+3. **Play Console → Users and permissions → Invite new users:** the service account's email address, with release permissions (testing tracks and production) for **that app only**.
+4. **Store the key:** `npx expo-build secrets /absolute/path/to/key.json` (or `gh secret set PLAY_SERVICE_ACCOUNT_JSON < key.json`). Then delete the key file.
+5. Use a kit tag with this feature in the workflow's `uses:` line and in `package.json`, and add the `play_track` input from `templates/build.yml` to the app's workflow.
 
 ## Development
 
