@@ -96,13 +96,19 @@ Install the slash commands in Claude Code:
    "plugins": [
      ["expo-build-kit/plugins/play-signing", { "keyAlias": "upload" }],
      ["expo-build-kit/plugins/dev-variant", { "suffix": ".dev" }],
-     "expo-build-kit/plugins/update-channel"
+     "expo-build-kit/plugins/update-channel",
+     "expo-build-kit/plugins/r8-optimization"
    ]
    ```
 
    - **`play-signing`** is required for `playstore`. Release builds sign with `<app>/keystores/release.jks` only when `PLAY_STORE_SIGNING=true`, which `playstore` sets. Otherwise they keep the debug signature. The passwords come from the env file: `PLAY_RELEASE_STORE_PASSWORD`, `PLAY_RELEASE_KEY_PASSWORD`, and optionally `PLAY_RELEASE_KEY_ALIAS`, which overrides `keyAlias`.
    - **`dev-variant`** is optional. It gives the debug build its own application id (`<package>.dev`) and the name "`<name> (Dev)`", so `dev` installs next to the release app instead of replacing it. Services registered per package id (Firebase, Google Sign-In, Play Billing) won't recognize the suffixed id unless you register it there too.
    - **`update-channel`** is needed for OTA hotfixes with `expo-updates`. It writes the `expo-channel-name` header into the binary at prebuild time. Local builds have no EAS Build to set it.
+   - **`r8-optimization`** is optional, for apps that minify release builds (`expo-build-properties`' `enableMinifyInReleaseBuilds`, plus `enableShrinkResourcesInReleaseBuilds` for the resource part). It addresses Play Console's "R8 optimisation" recommendation:
+     - it swaps the template's `proguard-android.txt` (which turns R8's optimizations off) for `proguard-android-optimize.txt`;
+     - it sets `android.r8.optimizedResourceShrinking=true` (Android Gradle plugin 8.6+).
+
+     Optimization can break code that's only reached by reflection, so test a release build on a device before shipping, and add keep rules with `extraProguardRules` for anything that breaks. The recommendation's third item, the Android Gradle plugin 9.0, comes with the React Native version, not a setting.
 
 4. **Add a root shortcut** (optional). An executable `expo-build` file at the repo root gives the same command in every project (`./expo-build install patch apk`), even when the app is in a subfolder. Set the `cd` line to the app's folder (`.` when the app is at the root):
 

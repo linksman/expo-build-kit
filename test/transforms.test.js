@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { applyPlaySigning, applyDevVariant, devStringsXml, bumpAppJson, SIGNING_MARKER } = require('../lib/transforms');
+const { applyPlaySigning, applyDevVariant, applyR8Optimization, devStringsXml, bumpAppJson, SIGNING_MARKER } = require('../lib/transforms');
 
 // The relevant part of the React Native template's android/app/build.gradle.
 const GRADLE = `android {
@@ -89,4 +89,16 @@ test('bumpAppJson falls back to a rewrite when another "version" key comes first
   assert.equal(parsed.expo.version, '2.0.0');
   assert.equal(parsed.expo.android.versionCode, 2);
   assert.equal(parsed.expo.plugins[0][1].version, '9');
+});
+
+test('r8-optimization swaps the default ProGuard file for the optimizing one', () => {
+  const release = `release {
+            minifyEnabled enableMinifyInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }`;
+  const out = applyR8Optimization(release);
+  assert.match(out, /getDefaultProguardFile\("proguard-android-optimize\.txt"\), "proguard-rules\.pro"/);
+  assert.doesNotMatch(out, /proguard-android\.txt/);
+  assert.equal(applyR8Optimization(out), out);
+  assert.equal(applyR8Optimization("getDefaultProguardFile('proguard-android.txt')"), 'getDefaultProguardFile("proguard-android-optimize.txt")');
 });
