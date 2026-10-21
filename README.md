@@ -146,7 +146,7 @@ Builds made before you add the plugin carry no channel and can't receive updates
 
 ## Building in GitHub Actions
 
-The kit ships a reusable workflow, `.github/workflows/build.yml`, that builds on request only. Each app calls it from a short workflow (`templates/build.yml`): the repo's **Actions** tab → **Build** → **Run workflow**, then pick the type (`install-apk`, `install-aab`, `playstore`, `dev`) and the version bump. The APK or AAB is attached to the run, unzipped, for 90 days. Fixes to the build go into the kit's workflow, and every app picks them up when it bumps the tag it calls.
+The kit ships a reusable workflow, `.github/workflows/build.yml`, that builds on request only. Each app calls it from a short workflow (`templates/build.yml`): the repo's **Actions** tab → **Build** → **Run workflow**, then pick the type (`install-apk`, `install-aab`, `playstore`, `dev`) and the version bump. The APK or AAB is attached to the run, unzipped, for 14 days (artifact storage is limited, so download the ones you keep). Fixes to the build go into the kit's workflow, and every app picks them up when it bumps the tag it calls.
 
 It runs the same commands as a local build with `EXPO_BUILD_CI=1`, which skips everything that needs a phone: `install` and `dev` only build and copy the artifact into `buildsDir`. Bumping, committing, tagging and pushing work as they do locally, done by `github-actions[bot]`. Versioned builds must run from the default branch; `dev` can run from any branch and skips the version bump. One build runs at a time.
 

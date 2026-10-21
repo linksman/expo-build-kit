@@ -198,7 +198,7 @@ jobs:
           path: ${{ steps.artifact.outputs.path }}
           archive: false # downloads as the .apk/.aab itself, not a zip
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 14 # GitHub's artifact quota is ~500 MB per account: download builds you want to keep
 
   # Uploads the AAB from the build job to a Google Play track. Testing tracks
   # roll out to their testers straight away; production is only a draft, so the
